@@ -99,11 +99,11 @@ func (g *GoodsHand) Create(ctx context.Context,
 		if errors.Is(err, storage.ErrGoodsExists) {
 			g.log.Warn("goods already exists", err)
 
-			return 0, fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
+			return int64(0), fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
 		}
 
 		g.log.Error("failed to save goods", err)
-		return 0, fmt.Errorf("%s: %w", op, err)
+		return int64(0), fmt.Errorf("%s: %w", op, err)
 	}
 
 	return goods, nil

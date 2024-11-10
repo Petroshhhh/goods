@@ -24,8 +24,7 @@ func MustGetEnv(key string) string {
 var ConnString = MustGetEnv("DATABASE_URL")
 
 type Storage struct {
-	log *log.Logger
-	db  *sqlx.DB
+	db *sqlx.DB
 }
 
 // Конструктор Storage
@@ -41,53 +40,26 @@ func New() (*Storage, error) {
 func (s *Storage) SaveGoods(ctx context.Context, brand string, placeSave int64, storeHouse int64, worker string) (int64, error) {
 	const op = "storage.postgres.SaveGoods"
 
-	res, err := s.db.ExecContext(ctx, "INSERT INTO goods (brand, place_save, store_house, worker) VALUES ($1, $2, $3, $4)", brand, placeSave, storeHouse, worker)
+	rows, err := s.db.QueryxContext(ctx, "INSERT INTO goods (brand, place_save, store_house, worker) VALUES ($1, $2, $3, $4) RETURNING id;", brand, placeSave, storeHouse, worker)
 	if err != nil {
-		s.log.Errorf("%s: Error inserting goods: %v", op, err)
-		return 0, fmt.Errorf("%s: %w", op, err)
+		return 0, fmt.Errorf("%s:Error inserting goods %w", op, err)
 	}
 
-	id, err := res.LastInsertId()
-	if err != nil {
-		s.log.Errorf("%s: Unable to retrieve last insert id: %v", op, err)
-		return 0, fmt.Errorf("%s: unable to retrieve last insert id: %w", op, err)
+	var id int64
+	defer rows.Close()
+
+	for rows.Next() {
+		if err := rows.Scan(&id); err != nil {
+			return 0, fmt.Errorf("%s:Error inserting goods %w", op, err)
+		}
 	}
 
-	s.log.Infof("%s: Successfully saved goods with id=%d", op, id)
+	if rows.Err() != nil {
+		return 0, fmt.Errorf("%s:Error inserting goods %w", op, err)
+	}
+
 	return id, nil
 }
-
-//func (s *Storage) SaveGoods(ctx context.Context, brand string, placeSave int64, storeHouse int64, worker string) (int64, error) {
-//	const op = "storage.postgres.SaveGoods"
-//
-//	// Выполняем запрос к БД
-//	//stmt, err := s.db.Prepare("INSERT INTO goods (brand, place_save, store_house, worker) VALUES ($1, $2, $3, $4)")
-//	//if err != nil {
-//	//	return 0, fmt.Errorf("%s: %w", op, err)
-//	//}
-//	//res, err := stmt.ExecContext(ctx, brand, placeSave, storeHouse, worker)
-//	//if err != nil {
-//	//	if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" { // Код ошибки для уникального ограничения
-//	//		return 0, fmt.Errorf("%s: %w", op, storage.ErrGoodsExists)
-//	//	}
-//	//	return 0, fmt.Errorf("%s: %w", op, err)
-//	//}
-//
-//	res, err := s.db.ExecContext(ctx, "INSERT INTO goods (brand, place_save, store_house, worker) VALUES ($1, $2, $3, $4)", brand, placeSave, storeHouse, worker)
-//	if err != nil {
-//		if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" { // Код ошибки для уникального ограничения
-//			return 0, fmt.Errorf("%s: %w", op, storage.ErrGoodsExists)
-//		}
-//		return 0, fmt.Errorf("%s: %w", op, err)
-//	}
-//
-//	id, err := res.LastInsertId() // Получаем последний вставленный ID
-//	if err != nil {
-//		return 0, fmt.Errorf("%s: unable to retrieve last insert id: %w", op, err)
-//	}
-//
-//	return id, nil
-//}
 
 func (s *Storage) Goods(ctx context.Context, id int64) (models.Goods, error) {
 	const op = "storage.postgres.Goods"
